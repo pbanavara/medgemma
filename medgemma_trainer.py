@@ -105,7 +105,7 @@ class LoRAConfig:
 
 @dataclass
 class ModelConfig:
-    model_name: str = "google/medgemma-4b-it"
+    model_name: str = "google/medgemma-4b-pt"
     load_in_4bit: bool = True    # bitsandbytes 4-bit on CUDA
     trust_remote_code: bool = False
 
