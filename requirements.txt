@@ -1,0 +1,20 @@
+# Core ML
+torch>=2.2.0
+torchdiffeq>=0.2.3
+
+# HuggingFace stack
+transformers>=4.45.0
+peft>=0.13.0
+accelerate>=0.34.0
+bitsandbytes>=0.43.0       # 4-bit quantization (CUDA only)
+
+# Data
+pandas>=2.0.0
+numpy>=1.26.0
+
+# Training utilities
+tqdm>=4.66.0
+scikit-learn>=1.4.0
+
+# HuggingFace Hub (model download + gated model auth)
+huggingface-hub>=0.24.0
