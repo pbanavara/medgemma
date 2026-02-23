@@ -155,7 +155,7 @@ class MedGemmaConfig:
 def get_dka_config() -> MedGemmaConfig:
     cfg = MedGemmaConfig()
     cfg.ode_rnn.input_dim = 1
-    cfg.ode_rnn.time_scale = 500.0
+    cfg.ode_rnn.time_scale = 72.0   # DKA resolves in 6-72h; normalize to this range
     cfg.training.max_seq_len = 20
     cfg.training.output_dir = "./checkpoints_medgemma_dka"
     return cfg
@@ -1047,6 +1047,8 @@ def main():
     parser.add_argument("--ode_checkpoint", type=str, default=None,
                         help="Pretrained ODE-RNN .pt to load (implies --freeze_ode)")
     parser.add_argument("--freeze_ode", action="store_true")
+    parser.add_argument("--time_scale", type=float, default=None,
+                        help="Override ODE-RNN time normalization (dka default: 72.0)")
     parser.add_argument("--log_file", default="auto")
     args = parser.parse_args()
 
@@ -1055,6 +1057,8 @@ def main():
         config.training.num_epochs = args.epochs
     if args.batch_size:
         config.training.batch_size = args.batch_size
+    if args.time_scale:
+        config.ode_rnn.time_scale = args.time_scale
 
     short = config.model.model_name.split("/")[-1]
     setup_file_logging(args.log_file, short, args.dataset)
