@@ -84,7 +84,7 @@ def setup_file_logging(log_file: str, model_short: str, dataset: str) -> None:
 class ODERNNConfig:
     input_dim: int = 1            # 1 for DKA (anion gap), 4 for SRTR
     hidden_dim: int = 64
-    time_scale: float = 500.0    # hours; set to 20000 for SRTR
+    time_scale: float = 72.0     # hours; 72 for DKA, 20000 for SRTR
     solver_method: str = "dopri5"
     rtol: float = 1e-3
     atol: float = 1e-4
