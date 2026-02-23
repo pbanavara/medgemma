@@ -460,9 +460,13 @@ class MedGemmaTrajectoryModel(nn.Module):
             attn = torch.cat(
                 [torch.ones(B, P, device=self._main_device), tokens["attention_mask"]], dim=1
             )
+            # Gemma3 requires token_type_ids when training (0 = text, 1 = image)
+            seq_len = combined.shape[1]
+            token_type_ids = torch.zeros(B, seq_len, dtype=torch.long, device=self._main_device)
             out = self.llm(
                 inputs_embeds=combined,
                 attention_mask=attn,
+                token_type_ids=token_type_ids,
                 output_hidden_states=True,
                 return_dict=True,
             )
@@ -511,9 +515,12 @@ class MedGemmaTrajectoryModel(nn.Module):
         resp_labels = response_ids.to(self._main_device)   # already -100 where padded
         labels = torch.cat([ignore, resp_labels], dim=1)
 
+        # Gemma3 requires token_type_ids when training (0 = text, 1 = image)
+        token_type_ids = torch.zeros(B, P + Q + R, dtype=torch.long, device=self._main_device)
         out = self.llm(
             inputs_embeds=full_embeds,
             attention_mask=attn,
+            token_type_ids=token_type_ids,
             labels=labels,
             return_dict=True,
         )
