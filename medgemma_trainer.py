@@ -387,7 +387,8 @@ class MedGemmaTrajectoryModel(nn.Module):
             atol=config.ode_rnn.atol,
         ).to("cpu")
 
-        llm_hidden = llm.config.hidden_size if llm is not None else 2560
+        _lcfg = getattr(llm.config, "text_config", llm.config) if llm is not None else None
+        llm_hidden = _lcfg.hidden_size if _lcfg is not None else 2560
         self.projection = TrajectoryProjection(
             trajectory_dim=config.ode_rnn.hidden_dim,
             llm_hidden_dim=llm_hidden,
@@ -595,7 +596,9 @@ def load_medgemma_with_lora(config: MedGemmaConfig):
     if config.training.gradient_checkpointing:
         model.gradient_checkpointing_enable()  # type: ignore[operator]
 
-    hidden_size: int = model.config.hidden_size  # type: ignore[union-attr]
+    # Gemma3Config nests text config under text_config; fall back to top-level
+    _cfg = getattr(model.config, "text_config", model.config)  # type: ignore[union-attr]
+    hidden_size: int = _cfg.hidden_size
     logger.info(f"MedGemma loaded — hidden_size: {hidden_size}")
     return model, tokenizer
 
@@ -862,6 +865,8 @@ def run_trajectory_only(
     train_loader: DataLoader,
     val_loader: DataLoader,
     num_epochs: int = 100,
+    patience: int = 10,
+    lr: float = 1e-4,
 ) -> Tuple[nn.Module, nn.Module, Dict]:
     from sklearn.metrics import roc_auc_score
 
@@ -882,13 +887,13 @@ def run_trajectory_only(
     ).to(main_device)
 
     optimizer = torch.optim.AdamW(
-        [{"params": ode_rnn.parameters(), "lr": 1e-4},
-         {"params": classifier.parameters(), "lr": 1e-4}],
+        [{"params": ode_rnn.parameters(), "lr": lr},
+         {"params": classifier.parameters(), "lr": lr}],
         weight_decay=0.1,
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
     criterion = nn.BCEWithLogitsLoss()
-    best_auc, patience_counter, patience = 0.0, 0, 10
+    best_auc, patience_counter = 0.0, 0
     history: Dict = {"train_loss": [], "val_acc": [], "val_auc": []}
 
     def _encode_batch(batch):
@@ -1049,6 +1054,10 @@ def main():
     parser.add_argument("--freeze_ode", action="store_true")
     parser.add_argument("--time_scale", type=float, default=None,
                         help="Override ODE-RNN time normalization (dka default: 72.0)")
+    parser.add_argument("--patience", type=int, default=None,
+                        help="Early stopping patience for trajectory-only training (default: 10)")
+    parser.add_argument("--traj_lr", type=float, default=None,
+                        help="Learning rate for trajectory-only ODE-RNN + classifier (default: 1e-4)")
     parser.add_argument("--log_file", default="auto")
     args = parser.parse_args()
 
@@ -1096,7 +1105,12 @@ def main():
     # Trajectory-only path (no LLM)
     if args.trajectory_only:
         tr, va, _ = _split(base_ds, config)
-        run_trajectory_only(config, tr, va, num_epochs=args.trajectory_epochs)
+        run_trajectory_only(
+            config, tr, va,
+            num_epochs=args.trajectory_epochs,
+            patience=args.patience if args.patience else 10,
+            lr=args.traj_lr if args.traj_lr else 1e-4,
+        )
         return
 
     # Load MedGemma
